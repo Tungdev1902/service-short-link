@@ -1,0 +1,168 @@
+#version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/local-ssl.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs:/app/logs
+    depends_on:
+      - service_shortlink
+    networks:
+      - shortlink-network
+
+  service_shortlink:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app
+    restart: unless-stopped
+    working_dir: /app
+    command: ["air", "-c", ".air.toml"]  # Use Air for hot reload
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PORT=${APP_PORT:-8080}
+      - APP_ENV=${APP_ENV:-development}
+      - DATABASE_HOST=${DATABASE_HOST:-mariadb}
+      - DATABASE_PORT=${DATABASE_PORT:-3306}
+      - DATABASE_USER=${DATABASE_USER:-shortlink}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-shortlink123}
+      - DATABASE_NAME=${DATABASE_NAME:-shortlink_db}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-fallback-jwt-secret}
+      - API_KEYS=${API_KEYS:-dev-api-key-12345,test-api-key-67890}
+      - BASE_URL=${BASE_URL:-http://short.sieuviet.com}
+      - DOMAIN=${DOMAIN:-short.sieuviet.com}
+      - CACHE_TTL_LINKS=${CACHE_TTL_LINKS:-86400}
+      - CACHE_TTL_QR=${CACHE_TTL_QR:-604800}
+      - SHORTCODE_LENGTH=${SHORTCODE_LENGTH:-7}
+      - SHORTCODE_MIN_LENGTH=${SHORTCODE_MIN_LENGTH:-5}
+      - SHORTCODE_MAX_LENGTH=${SHORTCODE_MAX_LENGTH:-10}
+      - DEFAULT_EXPIRY_DAYS=${DEFAULT_EXPIRY_DAYS:-365}
+    volumes:
+      - .:/app 
+      - /app/vendor 
+      - go-mod-cache:/go/pkg/mod 
+      - ./logs:/app/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - shortlink-network
+
+  mariadb:
+    image: mysql:8.0
+    container_name: mariadb
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-shortlink_db}
+      - MYSQL_USER=${MYSQL_USER:-shortlink}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-shortlink123}
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shortlink-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shortlink-network
+
+  redis_ui:
+    image: patrikx3/p3x-redis-ui:latest
+    container_name: redis_ui
+    restart: unless-stopped
+    ports:
+      - "7843:7843"
+    volumes:
+      - ./docker/redis-ui-settings:/settings
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - shortlink-network
+
+networks:
+  shortlink-network:
+    driver: bridge
+
+volumes:
+  mariadb-data:
+    driver: local
+  redis-data:
+    driver: local
+  go-mod-cache:
+    driver: local

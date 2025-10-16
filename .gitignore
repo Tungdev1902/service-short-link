@@ -1,0 +1,43 @@
+# Logs
+logs/
+*.log
+
+# Binaries
+shortlink
+*.exe
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Dependencies
+vendor/
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Go
+go.sum
+
+# Data
+data/
+*.mmdb
+
+scripts/
+
+tmp/
+Makefile
+VERSION

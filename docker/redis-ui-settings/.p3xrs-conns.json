@@ -1,0 +1,37 @@
+{
+    "update": "2025-10-13T09:39:25.762Z",
+    "list": [
+        {
+            "name": "redis-go lang",
+            "host": "redis",
+            "port": 6379,
+            "askAuth": false,
+            "password": "Rfds4gfdhfdsg",
+            "username": "",
+            "id": "P3Xid9c70209d99101000d2aa2d73a7d351",
+            "tlsWithoutCert": false,
+            "tlsRejectUnauthorized": false,
+            "ssh": false,
+            "sshPort": 22,
+            "cluster": false,
+            "sentinel": false,
+            "nodes": []
+        },
+        {
+            "name": "redis ui",
+            "host": "103.110.84.225",
+            "port": 6379,
+            "askAuth": false,
+            "password": "gS8nW5pVt2qLz9Fy",
+            "username": "",
+            "id": "P3Xidfb360fcd9910100008cb2535af8e3b",
+            "tlsWithoutCert": false,
+            "tlsRejectUnauthorized": false,
+            "ssh": false,
+            "sshPort": 22,
+            "cluster": false,
+            "sentinel": false,
+            "nodes": []
+        }
+    ]
+}

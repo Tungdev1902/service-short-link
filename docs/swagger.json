@@ -1,0 +1,374 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "High-performance URL shortening service with analytics tracking",
+        "title": "ShortLink Service API",
+        "termsOfService": "https://shortlink.vieclam24h.vn/terms",
+        "contact": {
+            "name": "TungTs",
+            "email": "tungts@nhanlucsieuviet.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0.0"
+    },
+    "host": "short.vieclam24h.vn",
+    "basePath": "/",
+    "paths": {
+        "/": {
+            "get": {
+                "description": "Returns basic information about the service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "info"
+                ],
+                "summary": "Get service information",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ServiceInfo"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/links": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new short link from a long URL. If short_code is provided, it must follow validation rules. Expiry is automatically set to default from config.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "links"
+                ],
+                "summary": "Create a new short link",
+                "parameters": [
+                    {
+                        "description": "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/domain.CreateLinkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Link created successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/transform.LinkCreatedDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input or short code already exists",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - valid JWT token or API key required",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns the health status of the service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HealthStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/qr/{code}": {
+            "get": {
+                "description": "Generates a QR code for the short link",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "qr"
+                ],
+                "summary": "Generate QR code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Short code",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/{code}": {
+            "get": {
+                "description": "Redirects to the original URL and tracks analytics",
+                "tags": [
+                    "redirect"
+                ],
+                "summary": "Redirect to original URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Short code",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Found"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "domain.CreateLinkRequest": {
+            "type": "object",
+            "required": [
+                "original_url"
+            ],
+            "properties": {
+                "channel_code": {
+                    "description": "ChannelCode is optional (max 50 characters)",
+                    "type": "string",
+                    "maxLength": 50,
+                    "example": "vl24h"
+                },
+                "description": {
+                    "description": "Description is optional (max 1000 characters)",
+                    "type": "string",
+                    "maxLength": 1000,
+                    "example": "This is an example website"
+                },
+                "original_url": {
+                    "description": "OriginalURL is required and must be a valid URL (max 2048 characters)",
+                    "type": "string",
+                    "maxLength": 2048,
+                    "example": "https://example.com/very/long/path"
+                },
+                "platform": {
+                    "description": "Platform is optional (max 50 characters)",
+                    "type": "string",
+                    "maxLength": 50,
+                    "example": "web"
+                },
+                "role": {
+                    "description": "Role is optional (max 50 characters)",
+                    "type": "string",
+                    "maxLength": 50,
+                    "example": "admin"
+                },
+                "short_code": {
+                    "description": "ShortCode is optional. If provided, must be 5-10 characters long, alphanumeric only, and not a reserved word",
+                    "type": "string",
+                    "maxLength": 10,
+                    "minLength": 5,
+                    "example": "abc123"
+                },
+                "title": {
+                    "description": "Title is optional (max 255 characters)",
+                    "type": "string",
+                    "maxLength": 255,
+                    "example": "Example Website"
+                }
+            }
+        },
+        "handler.ErrorEnvelope": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/handler.ErrorPayload"
+                },
+                "meta": {},
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.ErrorPayload": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "details": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.HealthStatus": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "healthy"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:45Z"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "72h30m15s"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        },
+        "handler.ServiceInfo": {
+            "type": "object",
+            "properties": {
+                "author": {
+                    "type": "string",
+                    "example": "TungTs"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "URL shortening service with analytics"
+                },
+                "go_version": {
+                    "type": "string",
+                    "example": "go1.21.0"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "ShortLink Service"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:45Z"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "72h30m15s"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        },
+        "handler.SuccessEnvelope": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "meta": {},
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "transform.LinkCreatedDTO": {
+            "type": "object",
+            "properties": {
+                "qr_url": {
+                    "type": "string",
+                    "example": "http://short.vieclam24h.vn/qr/aB3x9K2"
+                },
+                "short_url": {
+                    "type": "string",
+                    "example": "http://short.vieclam24h.vn/aB3x9K2"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "description": "API Key for external clients",
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header"
+        },
+        "BearerAuth": {
+            "description": "JWT Bearer token for internal services",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

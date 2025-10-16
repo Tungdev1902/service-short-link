@@ -1,0 +1,217 @@
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: shortlink-nginx-prod
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/production.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx-logs:/var/log/nginx
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      service_shortlink:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shortlink-network
+
+  service_shortlink:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      args:
+        - BUILD_DATE=${BUILD_DATE}
+        - VERSION=${VERSION}
+        - GIT_COMMIT=${GIT_COMMIT}
+    container_name: shortlink-app-prod
+    restart: unless-stopped
+    user: "1000:1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2048M
+        reservations:
+          cpus: '2.0'
+          memory: 1024M
+      replicas: 3
+    expose:
+      - "8080"
+    environment:
+      - APP_PORT=8080
+      - APP_ENV=production
+      - SHORTLINK_DATABASE_HOST=mariadb
+      - SHORTLINK_DATABASE_PORT=3306
+      - SHORTLINK_DATABASE_USER=${MYSQL_USER}
+      - SHORTLINK_DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - SHORTLINK_DATABASE_DBNAME=${MYSQL_DATABASE}
+      - SHORTLINK_REDIS_HOST=redis
+      - SHORTLINK_REDIS_PORT=6379
+      - SHORTLINK_REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SHORTLINK_JWT_SECRET=${JWT_SECRET}
+      - SHORTLINK_API_KEYS=${API_KEYS}
+      - SHORTLINK_BASE_URL=${SHORTLINK_BASE_URL}
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - shortlink-network
+
+  mariadb:
+    image: mariadb:11.2
+    container_name: shortlink-mariadb-prod
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8192M
+        reservations:
+          cpus: '2.0'
+          memory: 4096M
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - TZ=Asia/Ho_Chi_Minh
+      - MYSQL_INNODB_BUFFER_POOL_SIZE=2G
+      - MYSQL_INNODB_LOG_FILE_SIZE=256M
+      - MYSQL_INNODB_FLUSH_LOG_AT_TRX_COMMIT=2
+      - MYSQL_INNODB_FLUSH_METHOD=O_DIRECT
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - mariadb-logs:/var/log/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+      - ./config/mariadb/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=2G
+      --innodb-log-file-size=256M
+      --innodb-flush-log-at-trx-commit=2
+      --innodb-flush-method=O_DIRECT
+      --max-connections=1000
+      --query-cache-size=128M
+      --query-cache-type=1
+      --slow-query-log=1
+      --slow-query-log-file=/var/log/mysql/slow.log
+      --long-query-time=2
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - shortlink-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: shortlink-redis-prod
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '1.0'
+          memory: 1024M
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 1536mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+      --timeout 300
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - redis-logs:/var/log/redis
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shortlink-network
+
+networks:
+  shortlink-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mariadb-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/data/mariadb
+  mariadb-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/logs/mariadb
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/data/redis
+  redis-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/logs/redis
+  nginx-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/logs/nginx
+  nginx-cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/shortlink/cache/nginx

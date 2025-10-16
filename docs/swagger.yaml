@@ -1,0 +1,259 @@
+basePath: /
+definitions:
+  domain.CreateLinkRequest:
+    properties:
+      channel_code:
+        description: ChannelCode is optional (max 50 characters)
+        example: vl24h
+        maxLength: 50
+        type: string
+      description:
+        description: Description is optional (max 1000 characters)
+        example: This is an example website
+        maxLength: 1000
+        type: string
+      original_url:
+        description: OriginalURL is required and must be a valid URL (max 2048 characters)
+        example: https://example.com/very/long/path
+        maxLength: 2048
+        type: string
+      platform:
+        description: Platform is optional (max 50 characters)
+        example: web
+        maxLength: 50
+        type: string
+      role:
+        description: Role is optional (max 50 characters)
+        example: admin
+        maxLength: 50
+        type: string
+      short_code:
+        description: ShortCode is optional. If provided, must be 5-10 characters long,
+          alphanumeric only, and not a reserved word
+        example: abc123
+        maxLength: 10
+        minLength: 5
+        type: string
+      title:
+        description: Title is optional (max 255 characters)
+        example: Example Website
+        maxLength: 255
+        type: string
+    required:
+    - original_url
+    type: object
+  handler.ErrorEnvelope:
+    properties:
+      error:
+        $ref: '#/definitions/handler.ErrorPayload'
+      meta: {}
+      success:
+        type: boolean
+    type: object
+  handler.ErrorPayload:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  handler.HealthStatus:
+    properties:
+      status:
+        example: healthy
+        type: string
+      timestamp:
+        example: "2024-01-15T10:30:45Z"
+        type: string
+      uptime:
+        example: 72h30m15s
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+    type: object
+  handler.ServiceInfo:
+    properties:
+      author:
+        example: TungTs
+        type: string
+      description:
+        example: URL shortening service with analytics
+        type: string
+      go_version:
+        example: go1.21.0
+        type: string
+      name:
+        example: ShortLink Service
+        type: string
+      start_time:
+        example: "2024-01-15T10:30:45Z"
+        type: string
+      uptime:
+        example: 72h30m15s
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+    type: object
+  handler.SuccessEnvelope:
+    properties:
+      data: {}
+      meta: {}
+      success:
+        type: boolean
+    type: object
+  transform.LinkCreatedDTO:
+    properties:
+      qr_url:
+        example: http://short.vieclam24h.vn/qr/aB3x9K2
+        type: string
+      short_url:
+        example: http://short.vieclam24h.vn/aB3x9K2
+        type: string
+    type: object
+host: short.vieclam24h.vn
+info:
+  contact:
+    email: tungts@nhanlucsieuviet.com
+    name: TungTs
+  description: High-performance URL shortening service with analytics tracking
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://shortlink.vieclam24h.vn/terms
+  title: ShortLink Service API
+  version: 1.0.0
+paths:
+  /:
+    get:
+      description: Returns basic information about the service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ServiceInfo'
+      summary: Get service information
+      tags:
+      - info
+  /{code}:
+    get:
+      description: Redirects to the original URL and tracks analytics
+      parameters:
+      - description: Short code
+        in: path
+        name: code
+        required: true
+        type: string
+      responses:
+        "302":
+          description: Found
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+      summary: Redirect to original URL
+      tags:
+      - redirect
+  /api/v1/links:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new short link from a long URL. If short_code is provided,
+        it must follow validation rules. Expiry is automatically set to default from
+        config.
+      parameters:
+      - description: Create link request - original_url is required, short_code is
+          optional but must be 5-10 alphanumeric characters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/domain.CreateLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Link created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/handler.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/transform.LinkCreatedDTO'
+              type: object
+        "400":
+          description: Bad request - invalid input or short code already exists
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized - valid JWT token or API key required
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+      summary: Create a new short link
+      tags:
+      - links
+  /health:
+    get:
+      description: Returns the health status of the service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthStatus'
+      summary: Health check endpoint
+      tags:
+      - health
+  /qr/{code}:
+    get:
+      description: Generates a QR code for the short link
+      parameters:
+      - description: Short code
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/handler.ErrorEnvelope'
+      summary: Generate QR code
+      tags:
+      - qr
+securityDefinitions:
+  ApiKeyAuth:
+    description: API Key for external clients
+    in: header
+    name: X-API-Key
+    type: apiKey
+  BearerAuth:
+    description: JWT Bearer token for internal services
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
