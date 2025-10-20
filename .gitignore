@@ -37,6 +37,7 @@ data/
 *.mmdb
 
 scripts/
+__debug_bin*
 
 tmp/
 Makefile

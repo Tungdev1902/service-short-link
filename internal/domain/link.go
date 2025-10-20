@@ -39,28 +39,28 @@ func (l *Link) IsAccessible() bool {
 type CreateLinkRequest struct {
 	// OriginalURL is required and must be a valid URL (max 2048 characters)
 	OriginalURL string `json:"original_url" binding:"required,url" example:"https://example.com/very/long/path" validate:"required,url,max=2048"`
-	
+
 	// ShortCode is optional. If provided, must be 5-10 characters long, alphanumeric only, and not a reserved word
 	ShortCode *string `json:"short_code,omitempty" example:"abc123" validate:"omitempty,min=5,max=10,alphanum"`
-	
+
 	// Title is optional (max 255 characters)
 	Title *string `json:"title,omitempty" example:"Example Website" validate:"omitempty,max=255"`
-	
+
 	// Description is optional (max 1000 characters)
 	Description *string `json:"description,omitempty" example:"This is an example website" validate:"omitempty,max=1000"`
 }
 
 // CreateLinkResponse represents the response after creating a short link
 type CreateLinkResponse struct {
-	ID          uint64    `json:"id" example:"1"`
-	ShortCode   string    `json:"short_code" example:"aB3x9K2"`
-	ShortURL    string    `json:"short_url" example:"http://short.vieclam24h.vn/aB3x9K2"`
-	QRCodeURL   string    `json:"qr_url" example:"http://short.vieclam24h.vn/qr/aB3x9K2"`
-	OriginalURL string    `json:"original_url" example:"https://example.com/very/long/path"`
-	Title       *string   `json:"title,omitempty" example:"Example Website"`
-	Description *string   `json:"description,omitempty" example:"This is an example website"`
+	ID          uint64     `json:"id" example:"1"`
+	ShortCode   string     `json:"short_code" example:"aB3x9K2"`
+	ShortURL    string     `json:"short_url" example:"http://short.vieclam24h.vn/aB3x9K2"`
+	QRCodeURL   string     `json:"qr_url" example:"http://short.vieclam24h.vn/qr/aB3x9K2"`
+	OriginalURL string     `json:"original_url" example:"https://example.com/very/long/path"`
+	Title       *string    `json:"title,omitempty" example:"Example Website"`
+	Description *string    `json:"description,omitempty" example:"This is an example website"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" example:"2025-12-31T23:59:59Z"`
-	CreatedAt   time.Time `json:"created_at" example:"2024-01-15T10:30:45Z"`
+	CreatedAt   time.Time  `json:"created_at" example:"2024-01-15T10:30:45Z"`
 }
 
 // LinkRepository defines the interface for link data operations

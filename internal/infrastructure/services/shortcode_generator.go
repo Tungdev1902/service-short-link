@@ -91,21 +91,6 @@ func (g *shortCodeGenerator) IsValid(shortCode string) bool {
 	
 	reservedWords := []string{
 		"admin", "api", "swagger", "health", "ready", "live",
-		"robots", "favicon", "sitemap", "login", "logout",
-		"register", "profile", "dashboard", "settings", "config",
-		"test", "debug", "dev", "staging", "prod", "production",
-		"www", "mail", "ftp", "ssh", "root", "user", "guest",
-		"help", "support", "contact", "about", "terms", "privacy",
-		"blog", "news", "forum", "chat", "shop", "store", "cart",
-		"checkout", "payment", "billing", "account", "signup",
-		"signin", "auth", "oauth", "callback", "redirect", "return",
-		"error", "404", "500", "maintenance", "upgrade", "update",
-		"download", "upload", "file", "image", "video", "audio",
-		"css", "js", "json", "xml", "rss", "atom", "feed",
-		"search", "find", "query", "result", "results", "list",
-		"page", "home", "index", "default", "main", "primary",
-		"secondary", "backup", "restore", "export", "import",
-		"sync", "backup", "restore", "migrate", "deploy",
 	}
 	
 	lowerCode := strings.ToLower(shortCode)

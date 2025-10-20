@@ -9,15 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "https://shortlink.vieclam24h.vn/terms",
-        "contact": {
-            "name": "TungTs",
-            "email": "tungts@nhanlucsieuviet.com"
-        },
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -66,7 +58,7 @@ const docTemplate = `{
                 "summary": "Create a new short link",
                 "parameters": [
                     {
-                        "description": "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters",
+                        "description": "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters. Platform/role/channel_code extracted from JWT for internal services.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -216,12 +208,6 @@ const docTemplate = `{
                 "original_url"
             ],
             "properties": {
-                "channel_code": {
-                    "description": "ChannelCode is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "vl24h"
-                },
                 "description": {
                     "description": "Description is optional (max 1000 characters)",
                     "type": "string",
@@ -233,18 +219,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 2048,
                     "example": "https://example.com/very/long/path"
-                },
-                "platform": {
-                    "description": "Platform is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "web"
-                },
-                "role": {
-                    "description": "Role is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "admin"
                 },
                 "short_code": {
                     "description": "ShortCode is optional. If provided, must be 5-10 characters long, alphanumeric only, and not a reserved word",
@@ -309,10 +283,6 @@ const docTemplate = `{
         "handler.ServiceInfo": {
             "type": "object",
             "properties": {
-                "author": {
-                    "type": "string",
-                    "example": "TungTs"
-                },
                 "description": {
                     "type": "string",
                     "example": "URL shortening service with analytics"
@@ -382,8 +352,8 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0.0",
-	Host:             "short.vieclam24h.vn",
-	BasePath:         "/",
+	Host:             "",
+	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "ShortLink Service API",
 	Description:      "High-performance URL shortening service with analytics tracking",

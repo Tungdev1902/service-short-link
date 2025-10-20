@@ -63,10 +63,9 @@ services:
       - SHORTCODE_LENGTH=${SHORTCODE_LENGTH:-7}
       - SHORTCODE_MIN_LENGTH=${SHORTCODE_MIN_LENGTH:-5}
       - SHORTCODE_MAX_LENGTH=${SHORTCODE_MAX_LENGTH:-10}
-      - DEFAULT_EXPIRY_DAYS=${DEFAULT_EXPIRY_DAYS:-365}
+      - DEFAULT_EXPIRY_SECONDS=${DEFAULT_EXPIRY_SECONDS:-0}
     volumes:
-      - .:/app 
-      - /app/vendor 
+      - .:/app:cached 
       - go-mod-cache:/go/pkg/mod 
       - ./logs:/app/logs
     depends_on:
