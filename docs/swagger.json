@@ -3,19 +3,9 @@
     "info": {
         "description": "High-performance URL shortening service with analytics tracking",
         "title": "ShortLink Service API",
-        "termsOfService": "https://shortlink.vieclam24h.vn/terms",
-        "contact": {
-            "name": "TungTs",
-            "email": "tungts@nhanlucsieuviet.com"
-        },
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-        },
+        "contact": {},
         "version": "1.0.0"
     },
-    "host": "short.vieclam24h.vn",
-    "basePath": "/",
     "paths": {
         "/": {
             "get": {
@@ -60,7 +50,7 @@
                 "summary": "Create a new short link",
                 "parameters": [
                     {
-                        "description": "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters",
+                        "description": "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters. Platform/role/channel_code extracted from JWT for internal services.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -210,12 +200,6 @@
                 "original_url"
             ],
             "properties": {
-                "channel_code": {
-                    "description": "ChannelCode is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "vl24h"
-                },
                 "description": {
                     "description": "Description is optional (max 1000 characters)",
                     "type": "string",
@@ -227,18 +211,6 @@
                     "type": "string",
                     "maxLength": 2048,
                     "example": "https://example.com/very/long/path"
-                },
-                "platform": {
-                    "description": "Platform is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "web"
-                },
-                "role": {
-                    "description": "Role is optional (max 50 characters)",
-                    "type": "string",
-                    "maxLength": 50,
-                    "example": "admin"
                 },
                 "short_code": {
                     "description": "ShortCode is optional. If provided, must be 5-10 characters long, alphanumeric only, and not a reserved word",
@@ -303,10 +275,6 @@
         "handler.ServiceInfo": {
             "type": "object",
             "properties": {
-                "author": {
-                    "type": "string",
-                    "example": "TungTs"
-                },
                 "description": {
                     "type": "string",
                     "example": "URL shortening service with analytics"

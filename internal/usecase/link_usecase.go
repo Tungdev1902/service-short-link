@@ -1,12 +1,12 @@
 package usecase
 
 import (
-    "fmt"
-    "time"
+	"fmt"
+	"time"
 
-    "service-short-link/internal/domain"
-    "service-short-link/internal/infrastructure/services"
-    "service-short-link/pkg/logger"
+	"service-short-link/internal/domain"
+	"service-short-link/internal/infrastructure/services"
+	"service-short-link/pkg/logger"
 )
 
 type LinkUseCase struct {
@@ -60,7 +60,7 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 		if !uc.codeGenerator.IsValid(*req.ShortCode) {
 			return nil, domain.ErrInvalidShortCode
 		}
-		
+
 		exists, err := uc.linkRepo.ExistsByShortCode(*req.ShortCode)
 		if err != nil {
 			logger.ErrorWithCockroachSimple(err, "CreateLink: failed to check short code existence", "error_type=database_query_failed")
@@ -69,7 +69,7 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 		if exists {
 			return nil, domain.ErrShortCodeExists
 		}
-		
+
 		shortCode = *req.ShortCode
 	} else {
 		shortCode, err = services.GenerateUniqueCode(
@@ -84,9 +84,9 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 	}
 
 	var expiresAt *time.Time
-	defaultDays := uc.configService.GetInt("shortlink.default_expiry_days")
-	if defaultDays > 0 {
-		expiry := time.Now().AddDate(0, 0, defaultDays)
+	// Use integer seconds; 0 or unset means no expiry
+	if seconds := uc.configService.GetInt("shortlink.default_expiry_seconds"); seconds > 0 {
+		expiry := time.Now().Add(time.Duration(seconds) * time.Second)
 		expiresAt = &expiry
 	}
 
@@ -108,8 +108,8 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 
 	err = uc.linkRepo.Create(link)
 	if err != nil {
-        logger.ErrorWithCockroachSimple(err, "CreateLink: failed to create link", "short_code="+shortCode, "error_type=database_create_failed")
-        return nil, domain.ErrInternalError
+		logger.ErrorWithCockroachSimple(err, "CreateLink: failed to create link", "short_code="+shortCode, "error_type=database_create_failed")
+		return nil, domain.ErrInternalError
 	}
 
 	ttl := time.Duration(uc.configService.GetInt("cache.ttl_links")) * time.Second
@@ -133,8 +133,6 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 
 	return response, nil
 }
-
-
 
 // RedirectLink handles link redirection with analytics tracking
 func (uc *LinkUseCase) RedirectLink(shortCode string, trackingData *domain.TrackingData) (string, error) {
@@ -192,12 +190,12 @@ func (uc *LinkUseCase) GenerateQRCode(shortCode string) ([]byte, error) {
 
 	baseURL := uc.configService.GetString("shortlink.base_url")
 	shortURL := fmt.Sprintf("%s/%s", baseURL, shortCode)
-	
-    qrData, err = uc.qrGenerator.Generate(shortURL, 256)
-    if err != nil {
-        logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to generate QR", "short_code="+shortCode, "short_url="+shortURL)
-        return nil, fmt.Errorf("failed to generate QR code: %w", err)
-    }
+
+	qrData, err = uc.qrGenerator.Generate(shortURL, 256)
+	if err != nil {
+		logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to generate QR", "short_code="+shortCode, "short_url="+shortURL)
+		return nil, fmt.Errorf("failed to generate QR code: %w", err)
+	}
 
 	ttl := time.Duration(uc.configService.GetInt("cache.ttl_qr")) * time.Second
 	uc.linkCache.SetQRCode(shortCode, qrData, ttl)
@@ -227,10 +225,10 @@ func (uc *LinkUseCase) trackAnalytics(linkID uint64, trackingData *domain.Tracki
 		ClickedAt: time.Now(),
 	}
 
-    err := uc.analyticsRepo.Create(analytics)
-    if err != nil {
-        logger.ErrorWithCockroachSimple(err, "trackAnalytics: failed to save analytics data", "link_id="+fmt.Sprintf("%d", linkID))
-    }
+	err := uc.analyticsRepo.Create(analytics)
+	if err != nil {
+		logger.ErrorWithCockroachSimple(err, "trackAnalytics: failed to save analytics data", "link_id="+fmt.Sprintf("%d", linkID))
+	}
 }
 
 func truncateString(s string, maxLen int) string {

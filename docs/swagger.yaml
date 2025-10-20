@@ -1,12 +1,6 @@
-basePath: /
 definitions:
   domain.CreateLinkRequest:
     properties:
-      channel_code:
-        description: ChannelCode is optional (max 50 characters)
-        example: vl24h
-        maxLength: 50
-        type: string
       description:
         description: Description is optional (max 1000 characters)
         example: This is an example website
@@ -16,16 +10,6 @@ definitions:
         description: OriginalURL is required and must be a valid URL (max 2048 characters)
         example: https://example.com/very/long/path
         maxLength: 2048
-        type: string
-      platform:
-        description: Platform is optional (max 50 characters)
-        example: web
-        maxLength: 50
-        type: string
-      role:
-        description: Role is optional (max 50 characters)
-        example: admin
-        maxLength: 50
         type: string
       short_code:
         description: ShortCode is optional. If provided, must be 5-10 characters long,
@@ -75,9 +59,6 @@ definitions:
     type: object
   handler.ServiceInfo:
     properties:
-      author:
-        example: TungTs
-        type: string
       description:
         example: URL shortening service with analytics
         type: string
@@ -113,16 +94,9 @@ definitions:
         example: http://short.vieclam24h.vn/aB3x9K2
         type: string
     type: object
-host: short.vieclam24h.vn
 info:
-  contact:
-    email: tungts@nhanlucsieuviet.com
-    name: TungTs
+  contact: {}
   description: High-performance URL shortening service with analytics tracking
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
-  termsOfService: https://shortlink.vieclam24h.vn/terms
   title: ShortLink Service API
   version: 1.0.0
 paths:
@@ -171,7 +145,8 @@ paths:
         config.
       parameters:
       - description: Create link request - original_url is required, short_code is
-          optional but must be 5-10 alphanumeric characters
+          optional but must be 5-10 alphanumeric characters. Platform/role/channel_code
+          extracted from JWT for internal services.
         in: body
         name: request
         required: true

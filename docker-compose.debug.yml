@@ -1,0 +1,94 @@
+# Debug docker-compose
+#version: '3.8'
+
+services:
+  service_shortlink_debug:
+    build:
+      context: .
+      dockerfile: Dockerfile.debug
+    container_name: app_debug
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # Delve debugger port
+    environment:
+      - APP_PORT=8080
+      - APP_ENV=development
+      - DATABASE_HOST=mariadb
+      - DATABASE_PORT=3306
+      - DATABASE_USER=shortlink
+      - DATABASE_PASSWORD=shortlink123
+      - DATABASE_NAME=shortlink_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - JWT_SECRET=XPY4b9BSp1FFqu6YhPItyT3qeWSQ9ylB
+      - API_KEYS=dev-api-key-12345,test-api-key-67890
+      - BASE_URL=http://localhost:8080
+      - DOMAIN=localhost
+    volumes:
+      - .:/app:cached 
+      - go-mod-cache:/go/pkg/mod 
+      - ./logs:/app/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - shortlink-network
+
+  mariadb:
+    image: mysql:8.0
+    container_name: mariadb_debug
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=shortlink_db
+      - MYSQL_USER=shortlink
+      - MYSQL_PASSWORD=shortlink123
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shortlink-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_debug
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shortlink-network
+
+networks:
+  shortlink-network:
+    driver: bridge
+
+volumes:
+  mariadb-data:
+    driver: local
+  redis-data:
+    driver: local
+  go-mod-cache:
+    driver: local

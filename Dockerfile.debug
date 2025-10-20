@@ -1,0 +1,47 @@
+# Debug Dockerfile
+FROM golang:1.24-alpine
+
+# Install development dependencies
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    curl \
+    bash \
+    make \
+    vim \
+    nano \
+    htop \
+    tree \
+    jq \
+    mariadb-client \
+    redis \
+    inotify-tools \
+    openssl
+
+# Set working directory
+WORKDIR /app
+
+# Install Go tools for development including delve debugger
+RUN go install github.com/air-verse/air@v1.62.0 && \
+    go install github.com/swaggo/swag/cmd/swag@latest && \
+    go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest && \
+    go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Copy go.mod and go.sum first for better caching
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download && go mod tidy
+
+# Create vendor directory
+RUN go mod vendor
+
+COPY .air.toml .air.toml
+
+# Expose ports
+EXPOSE 8080 2345
+
+# Default command - run with delve debugger
+WORKDIR /app
+CMD ["dlv", "debug", "--headless", "--listen=:2345", "--api-version=2", "--accept-multiclient", "./cmd/api"]

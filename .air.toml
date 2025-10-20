@@ -1,44 +1,35 @@
+# .air.toml
 root = "."
-testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = []
+  # Build ra binary và chạy, để Air kiểm soát stop/start tiến trình tránh lỗi port in use
+  cmd = "go build -o ./tmp/main ./cmd/api"
   bin = "./tmp/main"
-  cmd = "mkdir -p tmp && go build -mod=mod -o ./tmp/main ./cmd/api"
-  delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "logs", "migrations"]
-  exclude_file = []
-  exclude_regex = ["_test.go"]
-  exclude_unchanged = false
-  follow_symlink = false
-  full_bin = ""
-  include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
-  include_file = []
-  kill_delay = "0s"
-  log = "build-errors.log"
-  poll = false
-  poll_interval = 0
-  rerun = false
-  rerun_delay = 500
-  send_interrupt = false
-  stop_on_root = false
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "logs", "migrations"]
+  # Bật polling để tránh mất event file-change trên Windows bind mounts
+  poll = true
+  poll_interval = 500
+
+[misc]
+  # Cho Air thêm thời gian gửi tín hiệu dừng phiên bản cũ trước khi chạy bản mới
+  clean_on_exit = true
+
+[log]
+  time = true
+
+[screen]
+  clear_on_rebuild = true
+
+[kill]
+  # Gửi SIGINT trước, đợi 1s rồi SIGKILL nếu cần
+  cmd = ""
+  signal = "int"
+  delay = 1000
 
 [color]
-  app = ""
   build = "yellow"
   main = "magenta"
   runner = "green"
   watcher = "cyan"
-
-[log]
-  main_only = false
-  time = false
-
-[misc]
-  clean_on_exit = false
-
-[screen]
-  clear_on_rebuild = false
-  keep_scroll = true

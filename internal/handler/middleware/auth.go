@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	AuthPlatformKey = "auth_platform"
-	AuthRoleKey     = "auth_role"
+	AuthPlatformKey   = "auth_platform"
+	AuthRoleKey       = "auth_role"
 	AuthIsInternalKey = "auth_is_internal"
 )
 
@@ -61,7 +61,7 @@ func (a *AuthMiddleware) FlexibleAuth() gin.HandlerFunc {
 			}
 		}
 
-		handler.RespondError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Valid JWT token or API key required", nil)
+		handler.RespondError(c, http.StatusUnauthorized, handler.CodeUnauthorized, "Valid JWT token or API key required", nil)
 		c.Abort()
 	}
 }
@@ -131,10 +131,10 @@ func GetAuthContext(c *gin.Context) (platform, role string, isInternal bool) {
 	platformVal, _ := c.Get(AuthPlatformKey)
 	roleVal, _ := c.Get(AuthRoleKey)
 	isInternalVal, _ := c.Get(AuthIsInternalKey)
-	
+
 	platformStr, _ := platformVal.(string)
 	roleStr, _ := roleVal.(string)
 	isInternalBool, _ := isInternalVal.(bool)
-	
+
 	return platformStr, roleStr, isInternalBool
 }

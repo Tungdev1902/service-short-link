@@ -1,14 +1,14 @@
 package main
 
 import (
-    "context"
-    "database/sql"
-    "fmt"
-    "net/http"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
+	"context"
+	"database/sql"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"service-short-link/internal/domain"
 	"service-short-link/internal/handler"
@@ -20,15 +20,15 @@ import (
 	"service-short-link/internal/usecase"
 	"service-short-link/pkg/logger"
 
-    _ "service-short-link/docs"
+	_ "service-short-link/docs"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/go-redis/redis/v8"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const (
@@ -39,12 +39,6 @@ const (
 // @title ShortLink Service API
 // @version 1.0.0
 // @description High-performance URL shortening service with analytics tracking
-
-// @contact.name TungTs
-// @contact.email tungts@nhanlucsieuviet.com
-
-// @host short.vieclam24h.vn
-// @BasePath /
 
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -71,7 +65,7 @@ func main() {
 			return wd
 		}(),
 	})
-	
+
 	configService := config.NewConfigService()
 	db, err := initDatabase(configService)
 	if err != nil {
@@ -105,13 +99,13 @@ func main() {
 	baseAnalyticsRepo := database.NewAnalyticsRepository(db)
 	baseLinkCache := cache.NewLinkCache(redisClient)
 
-    linkRepo = baseLinkRepo
-    analyticsRepo = baseAnalyticsRepo
-    linkCache = baseLinkCache
-	
-    minLen := configService.GetInt("shortlink.shortcode_min_length")
-    maxLen := configService.GetInt("shortlink.shortcode_max_length")
-    shortCodeGenerator := services.NewShortCodeGeneratorWithBounds(minLen, maxLen)
+	linkRepo = baseLinkRepo
+	analyticsRepo = baseAnalyticsRepo
+	linkCache = baseLinkCache
+
+	minLen := configService.GetInt("shortlink.shortcode_min_length")
+	maxLen := configService.GetInt("shortlink.shortcode_max_length")
+	shortCodeGenerator := services.NewShortCodeGeneratorWithBounds(minLen, maxLen)
 	qrGenerator := services.NewQRCodeGenerator()
 	urlValidator := services.NewURLValidator()
 	userAgentParser := services.NewUserAgentParser()
@@ -135,7 +129,7 @@ func main() {
 		configService.GetAPIKeys(),
 	)
 
-    router := setupRouter(configService, authMiddleware, linkHandler, healthHandler)
+	router := setupRouter(configService, authMiddleware, linkHandler, healthHandler)
 
 	// Create server
 	serverConfig := configService.GetServerConfig()
@@ -177,10 +171,10 @@ func main() {
 
 // setupRouter configures the Gin router with all routes and middleware
 func setupRouter(
-    configService domain.ConfigService,
-    authMiddleware *middleware.AuthMiddleware,
-    linkHandler *handler.LinkHandler,
-    healthHandler *handler.HealthHandler,
+	configService domain.ConfigService,
+	authMiddleware *middleware.AuthMiddleware,
+	linkHandler *handler.LinkHandler,
+	healthHandler *handler.HealthHandler,
 ) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("APP_ENV") == "production" {
@@ -188,6 +182,7 @@ func setupRouter(
 	}
 
 	router := gin.New()
+	router.HandleMethodNotAllowed = true
 
 	// Global middleware
 	router.Use(middleware.Recovery())
@@ -202,13 +197,25 @@ func setupRouter(
 	router.GET("/ready", healthHandler.ReadinessProbe)
 	router.GET("/live", healthHandler.LivenessProbe)
 
+	// Standardized 404 and 405 responses
+	router.NoRoute(func(c *gin.Context) {
+		handler.RespondError(c, http.StatusNotFound, handler.CodeNotFound, "Resource not found", gin.H{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+		})
+	})
+	router.NoMethod(func(c *gin.Context) {
+		handler.RespondError(c, http.StatusMethodNotAllowed, handler.CodeMethodNotAllowed, "Method not allowed", gin.H{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+		})
+	})
+
 	// Swagger documentation
 	router.GET("/swagger", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
 	})
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-
 
 	// Protected routes (require JWT or API Key) - Only for management APIs
 	protected := router.Group("/")
@@ -230,8 +237,8 @@ func setupRouter(
 // initDatabase initializes the database connection
 func initDatabase(configService domain.ConfigService) (*sql.DB, error) {
 	dbConfig := configService.GetDatabaseConfig()
-	
-    dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&tls=false&allowNativePasswords=true&multiStatements=false&interpolateParams=true&readTimeout=5s&writeTimeout=5s&timeout=5s",
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&tls=false&allowNativePasswords=true&multiStatements=false&interpolateParams=true&readTimeout=5s&writeTimeout=5s&timeout=5s",
 		dbConfig.User,
 		dbConfig.Password,
 		dbConfig.Host,
@@ -248,39 +255,39 @@ func initDatabase(configService domain.ConfigService) (*sql.DB, error) {
 	db.SetMaxIdleConns(dbConfig.MaxIdleConns)
 	db.SetConnMaxLifetime(dbConfig.ConnMaxLifetime)
 
-    if err := pingDatabaseWithRetry(db, 8, 500*time.Millisecond, 5*time.Second); err != nil {
-        return nil, fmt.Errorf("failed to ping database: %w", err)
-    }
+	if err := pingDatabaseWithRetry(db, 8, 500*time.Millisecond, 5*time.Second); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
 
 	return db, nil
 }
 
 // pingDatabaseWithRetry pings the DB with exponential backoff up to maxAttempts
 func pingDatabaseWithRetry(db *sql.DB, maxAttempts int, initialBackoff time.Duration, maxBackoff time.Duration) error {
-    backoff := initialBackoff
-    for attempt := 1; attempt <= maxAttempts; attempt++ {
-        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-        err := db.PingContext(ctx)
-        cancel()
-        if err == nil {
-            return nil
-        }
-        if attempt == maxAttempts {
-            return err
-        }
-        time.Sleep(backoff)
-        backoff *= 2
-        if backoff > maxBackoff {
-            backoff = maxBackoff
-        }
-    }
-    return nil
+	backoff := initialBackoff
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := db.PingContext(ctx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		if attempt == maxAttempts {
+			return err
+		}
+		time.Sleep(backoff)
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+	return nil
 }
 
 // initRedis initializes the Redis connection
 func initRedis(configService domain.ConfigService) (*redis.Client, error) {
 	redisConfig := configService.GetRedisConfig()
-	
+
 	client := redis.NewClient(&redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", redisConfig.Host, redisConfig.Port),
 		Password:     redisConfig.Password,
@@ -321,4 +328,3 @@ func runMigrations(db *sql.DB, configService domain.ConfigService) error {
 	logger.Info("Database migrations completed successfully", nil)
 	return nil
 }
-

@@ -15,13 +15,13 @@ type configService struct {
 // NewConfigService creates a new configuration service
 func NewConfigService() domain.ConfigService {
 	v := viper.New()
-	
+
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	bindEnvironmentVariables(v)
 	setDefaults(v)
-	
+
 	return &configService{v: v}
 }
 
@@ -29,28 +29,28 @@ func NewConfigService() domain.ConfigService {
 func bindEnvironmentVariables(v *viper.Viper) {
 	v.BindEnv("auth.jwt_secret", "JWT_SECRET")
 	v.BindEnv("auth.api_keys", "API_KEYS")
-	
+
 	v.BindEnv("server.port", "APP_PORT")
-	
-	v.BindEnv("database.host", "DATABASE_HOST") 
+
+	v.BindEnv("database.host", "DATABASE_HOST")
 	v.BindEnv("database.port", "DATABASE_PORT")
 	v.BindEnv("database.user", "DATABASE_USER")
 	v.BindEnv("database.password", "DATABASE_PASSWORD")
 	v.BindEnv("database.dbname", "DATABASE_NAME")
-	
+
 	v.BindEnv("redis.host", "REDIS_HOST")
-	v.BindEnv("redis.port", "REDIS_PORT") 
+	v.BindEnv("redis.port", "REDIS_PORT")
 	v.BindEnv("redis.password", "REDIS_PASSWORD")
-	
+
 	v.BindEnv("shortlink.base_url", "BASE_URL")
 	v.BindEnv("shortlink.shortcode_length", "SHORTCODE_LENGTH")
-    v.BindEnv("shortlink.shortcode_min_length", "SHORTCODE_MIN_LENGTH")
-    v.BindEnv("shortlink.shortcode_max_length", "SHORTCODE_MAX_LENGTH")
-	v.BindEnv("shortlink.default_expiry_days", "DEFAULT_EXPIRY_DAYS")
-	
+	v.BindEnv("shortlink.shortcode_min_length", "SHORTCODE_MIN_LENGTH")
+	v.BindEnv("shortlink.shortcode_max_length", "SHORTCODE_MAX_LENGTH")
+	v.BindEnv("shortlink.default_expiry_seconds", "DEFAULT_EXPIRY_SECONDS")
+
 	v.BindEnv("cache.ttl_links", "CACHE_TTL_LINKS")
 	v.BindEnv("cache.ttl_qr", "CACHE_TTL_QR")
-	
+
 }
 
 // setDefaults sets default configuration values
@@ -59,7 +59,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.read_timeout", "10s")
 	v.SetDefault("server.write_timeout", "10s")
 	v.SetDefault("server.idle_timeout", "60s")
-	
+
 	v.SetDefault("database.host", "localhost")
 	v.SetDefault("database.port", 3306)
 	v.SetDefault("database.user", "shortlink")
@@ -68,32 +68,32 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.max_open_conns", 25)
 	v.SetDefault("database.max_idle_conns", 10)
 	v.SetDefault("database.conn_max_lifetime", "300s")
-	
+
 	v.SetDefault("redis.host", "localhost")
 	v.SetDefault("redis.port", 6379)
 	v.SetDefault("redis.password", "")
 	v.SetDefault("redis.database", 0)
 	v.SetDefault("redis.pool_size", 10)
 	v.SetDefault("redis.min_idle_conns", 5)
-	
+
 	v.SetDefault("auth.jwt_secret", "your-secret-key")
 	v.SetDefault("auth.api_keys", "dev-api-key")
-	
+
 	v.SetDefault("shortlink.base_url", "http://localhost:8080")
 	v.SetDefault("shortlink.shortcode_length", 7)
-    v.SetDefault("shortlink.shortcode_min_length", 5)
-    v.SetDefault("shortlink.shortcode_max_length", 10)
-	v.SetDefault("shortlink.default_expiry_days", 365)
-	
+	v.SetDefault("shortlink.shortcode_min_length", 5)
+	v.SetDefault("shortlink.shortcode_max_length", 10)
+	// 0 seconds means no expiry by default
+	v.SetDefault("shortlink.default_expiry_seconds", 0)
+
 	// Cache defaults
-	v.SetDefault("cache.ttl_links", 86400)  // 24 hours
-	v.SetDefault("cache.ttl_qr", 604800)    // 7 days
-	
-	
+	v.SetDefault("cache.ttl_links", 86400) // 24 hours
+	v.SetDefault("cache.ttl_qr", 604800)   // 7 days
+
 	// Rate limiting defaults
 	v.SetDefault("rate_limiting.create_links", 60)
 	v.SetDefault("rate_limiting.redirect", 300)
-	
+
 }
 
 // GetString returns a string configuration value
@@ -115,7 +115,6 @@ func (c *configService) GetBool(key string) bool {
 func (c *configService) GetDuration(key string) string {
 	return c.v.GetString(key)
 }
-
 
 // GetJWTSecret returns the JWT secret key
 func (c *configService) GetJWTSecret() string {
@@ -166,4 +165,3 @@ func (c *configService) GetServerConfig() domain.ServerConfig {
 		IdleTimeout:  c.v.GetDuration("server.idle_timeout"),
 	}
 }
-
