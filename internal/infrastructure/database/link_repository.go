@@ -1,15 +1,15 @@
 package database
 
 import (
-    "context"
-    "database/sql"
-    "fmt"
-    "time"
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
 
-    "service-short-link/internal/domain"
-    "service-short-link/pkg/logger"
+	"service-short-link/internal/domain"
+	"service-short-link/pkg/logger"
 
-    _ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type linkRepository struct {
@@ -28,10 +28,10 @@ func (r *linkRepository) Create(link *domain.Link) error {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    result, err := r.db.ExecContext(ctx, query,
+	result, err := r.db.ExecContext(ctx, query,
 		link.ShortCode,
 		link.OriginalURL,
 		link.Title,
@@ -59,8 +59,7 @@ func (r *linkRepository) Create(link *domain.Link) error {
 	return nil
 }
 
-
-// GetByShortCode retrieves a link by its short code
+// GetByShortCode retrieves a link by its short code (full data)
 func (r *linkRepository) GetByShortCode(shortCode string) (*domain.Link, error) {
 	query := `
 		SELECT id, short_code, original_url, title, description, is_active, expires_at, 
@@ -69,11 +68,11 @@ func (r *linkRepository) GetByShortCode(shortCode string) (*domain.Link, error) 
 		WHERE short_code = ?
 	`
 
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    link := &domain.Link{}
-    err := r.db.QueryRowContext(ctx, query, shortCode).Scan(
+	link := &domain.Link{}
+	err := r.db.QueryRowContext(ctx, query, shortCode).Scan(
 		&link.ID,
 		&link.ShortCode,
 		&link.OriginalURL,
@@ -101,11 +100,41 @@ func (r *linkRepository) GetByShortCode(shortCode string) (*domain.Link, error) 
 	return link, nil
 }
 
-func (r *linkRepository) ExistsByShortCode(shortCode string) (bool, error) {
-    query := `SELECT COUNT(*) FROM links WHERE short_code = ?`
+// GetForRedirect retrieves minimal link data optimized for redirection
+func (r *linkRepository) GetForRedirect(shortCode string) (*domain.LinkForRedirect, error) {
+	query := `
+		SELECT id, original_url, is_active, expires_at
+		FROM links 
+		WHERE short_code = ?
+	`
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	link := &domain.LinkForRedirect{}
+	err := r.db.QueryRowContext(ctx, query, shortCode).Scan(
+		&link.ID,
+		&link.OriginalURL,
+		&link.IsActive,
+		&link.ExpiresAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, domain.ErrLinkNotFound
+		}
+		logger.ErrorWithCockroachSimple(err, "LinkRepository.GetForRedirect: failed to get link for redirect", "short_code="+shortCode, "error_type=database_query_failed")
+		return nil, fmt.Errorf("failed to get link for redirect: %w", err)
+	}
+
+	return link, nil
+}
+
+func (r *linkRepository) ExistsByShortCode(shortCode string) (bool, error) {
+	query := `SELECT COUNT(*) FROM links WHERE short_code = ?`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
 	var count int
 	err := r.db.QueryRowContext(ctx, query, shortCode).Scan(&count)
@@ -119,12 +148,12 @@ func (r *linkRepository) ExistsByShortCode(shortCode string) (bool, error) {
 
 // IncrementClickCount atomically increments the click count for a link
 func (r *linkRepository) IncrementClickCount(linkID uint64) error {
-    query := `UPDATE links SET click_count = click_count + 1 WHERE id = ?`
+	query := `UPDATE links SET click_count = click_count + 1 WHERE id = ?`
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-    result, err := r.db.ExecContext(ctx, query, linkID)
+	result, err := r.db.ExecContext(ctx, query, linkID)
 	if err != nil {
 		logger.ErrorWithCockroachSimple(err, "LinkRepository.IncrementClickCount: failed to increment click count", "link_id="+fmt.Sprintf("%d", linkID), "error_type=database_update_failed")
 		return fmt.Errorf("failed to increment click count: %w", err)
@@ -145,13 +174,13 @@ func (r *linkRepository) IncrementClickCount(linkID uint64) error {
 
 // UpdateLastAccessed updates the last accessed timestamp for a link
 func (r *linkRepository) UpdateLastAccessed(linkID uint64) error {
-    query := `UPDATE links SET last_accessed_at = ? WHERE id = ?`
+	query := `UPDATE links SET last_accessed_at = ? WHERE id = ?`
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-    now := time.Now()
-    result, err := r.db.ExecContext(ctx, query, now, linkID)
+	now := time.Now()
+	result, err := r.db.ExecContext(ctx, query, now, linkID)
 	if err != nil {
 		logger.ErrorWithCockroachSimple(err, "LinkRepository.UpdateLastAccessed: failed to update last accessed time", "link_id="+fmt.Sprintf("%d", linkID), "error_type=database_update_failed")
 		return fmt.Errorf("failed to update last accessed time: %w", err)

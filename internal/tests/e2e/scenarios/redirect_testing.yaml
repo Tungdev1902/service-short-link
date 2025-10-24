@@ -1,0 +1,49 @@
+name: "Redirect Flow Testing E2E"
+steps:
+  - name: "Create link for redirect testing"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/status/200"
+        short_code: "redir456"
+    expect:
+      status: 201
+
+  - name: "Create second link for redirect testing"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/status/200"
+        short_code: "ext123"
+    expect:
+      status: 201
+
+  - name: "Redirect to external URL"
+    request:
+      method: GET
+      url: /ext123
+    expect:
+      status: 302
+      header:
+        Location: "https://httpbin.org/status/200"
+
+  - name: "Test redirect with query parameters"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/get?test=redirect&param=value"
+        short_code: "qry123"
+    expect:
+      status: 201
+
+  - name: "Redirect with query parameters"
+    request:
+      method: GET
+      url: /qry123
+    expect:
+      status: 302
+      header:
+        Location: "https://httpbin.org/get?test=redirect&param=value"

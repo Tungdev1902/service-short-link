@@ -1,0 +1,91 @@
+name: "API Endpoints Comprehensive E2E Test"
+steps:
+  - name: "Create link with custom short code"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://api-test.example.com/custom-code"
+        short_code: "test${RANDOM}"
+    extract:
+      short_code: "$.data.short_url"
+    expect:
+      status: 201
+      contains: ["short_url", "qr_url"]
+
+  - name: "Redirect with custom short code"
+    request:
+      method: GET
+      url: /${short_code}
+    expect:
+      status: 302
+      header:
+        Location: "https://api-test.example.com/custom-code"
+
+  - name: "Generate QR code for custom short code"
+    request:
+      method: GET
+      url: /qr/${short_code}
+    expect:
+      status: 200
+      header:
+        Content-Type: "image/png"
+
+  - name: "Test invalid URL format"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "not-a-valid-url"
+    expect:
+      status: 400
+      contains: ["Invalid request body"]
+
+  - name: "Create first link for conflict test"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://conflict-test-1.example.com"
+        short_code: "conf123"
+    expect:
+      status: 201
+      contains: ["short_url", "qr_url"]
+
+  - name: "Test short code conflict - same short code"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://conflict-test-2.example.com"
+        short_code: "conf123"
+    expect:
+      status: 409
+      contains: ["Short code already exists"]
+
+  - name: "Test invalid short code format"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://invalid-shortcode.example.com"
+        short_code: "ab"  # Too short
+    expect:
+      status: 400
+      contains: ["Invalid short code format"]
+
+  - name: "Test non-existent short code redirect"
+    request:
+      method: GET
+      url: /nonexistent123
+    expect:
+      status: 404
+      contains: ["Short link not found"]
+
+  - name: "Test non-existent QR code"
+    request:
+      method: GET
+      url: /qr/nonexistent123
+    expect:
+      status: 404
+      contains: ["Short link not found"]

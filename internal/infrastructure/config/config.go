@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 
 	"service-short-link/internal/domain"
@@ -38,6 +39,12 @@ func bindEnvironmentVariables(v *viper.Viper) {
 	v.BindEnv("database.password", "DATABASE_PASSWORD")
 	v.BindEnv("database.dbname", "DATABASE_NAME")
 
+	v.BindEnv("shortlink.test_db_host", "TEST_DB_HOST")
+	v.BindEnv("shortlink.test_db_port", "TEST_DB_PORT")
+	v.BindEnv("shortlink.test_db_user", "TEST_DB_USER")
+	v.BindEnv("shortlink.test_db_password", "TEST_DB_PASSWORD")
+	v.BindEnv("shortlink.test_db_name", "TEST_DB_NAME")
+
 	v.BindEnv("redis.host", "REDIS_HOST")
 	v.BindEnv("redis.port", "REDIS_PORT")
 	v.BindEnv("redis.password", "REDIS_PASSWORD")
@@ -51,6 +58,7 @@ func bindEnvironmentVariables(v *viper.Viper) {
 	v.BindEnv("cache.ttl_links", "CACHE_TTL_LINKS")
 	v.BindEnv("cache.ttl_qr", "CACHE_TTL_QR")
 
+	v.BindEnv("e2e.test_mode", "E2E_TEST_MODE")
 }
 
 // setDefaults sets default configuration values
@@ -60,26 +68,35 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.write_timeout", "10s")
 	v.SetDefault("server.idle_timeout", "60s")
 
-	v.SetDefault("database.host", "localhost")
+	v.SetDefault("database.host", "mariadb")
 	v.SetDefault("database.port", 3306)
 	v.SetDefault("database.user", "shortlink")
 	v.SetDefault("database.password", "shortlink123")
 	v.SetDefault("database.dbname", "shortlink_db")
-	v.SetDefault("database.max_open_conns", 25)
-	v.SetDefault("database.max_idle_conns", 10)
+	v.SetDefault("database.max_open_conns", 100)
+	v.SetDefault("database.max_idle_conns", 25)
 	v.SetDefault("database.conn_max_lifetime", "300s")
 
-	v.SetDefault("redis.host", "localhost")
+	// Test database defaults
+	v.SetDefault("shortlink.test_db_host", "mariadb_test")
+	v.SetDefault("shortlink.test_db_port", 3306)
+	v.SetDefault("shortlink.test_db_user", "testuser")
+	v.SetDefault("shortlink.test_db_password", "testpass")
+	v.SetDefault("shortlink.test_db_name", "shortlink_db_test")
+
+	v.SetDefault("e2e.test_mode", false)
+
+	v.SetDefault("redis.host", "redis")
 	v.SetDefault("redis.port", 6379)
 	v.SetDefault("redis.password", "")
 	v.SetDefault("redis.database", 0)
-	v.SetDefault("redis.pool_size", 10)
-	v.SetDefault("redis.min_idle_conns", 5)
+	v.SetDefault("redis.pool_size", 50)
+	v.SetDefault("redis.min_idle_conns", 10)
 
-	v.SetDefault("auth.jwt_secret", "your-secret-key")
+	v.SetDefault("auth.jwt_secret", "XPY4b9BSp1FFqu6YhPItyT3qeWSQ9ylB")
 	v.SetDefault("auth.api_keys", "dev-api-key")
 
-	v.SetDefault("shortlink.base_url", "http://localhost:8080")
+	v.SetDefault("shortlink.base_url", "http://short.sieuviet.com")
 	v.SetDefault("shortlink.shortcode_length", 7)
 	v.SetDefault("shortlink.shortcode_min_length", 5)
 	v.SetDefault("shortlink.shortcode_max_length", 10)
@@ -93,6 +110,10 @@ func setDefaults(v *viper.Viper) {
 	// Rate limiting defaults
 	v.SetDefault("rate_limiting.create_links", 60)
 	v.SetDefault("rate_limiting.redirect", 300)
+
+	// Performance monitoring defaults
+	v.SetDefault("performance.enable_metrics", true)
+	v.SetDefault("performance.metrics_interval", "30s")
 
 }
 
@@ -132,12 +153,31 @@ func (c *configService) GetAPIKeys() []string {
 
 // GetDatabaseConfig returns database configuration
 func (c *configService) GetDatabaseConfig() domain.DatabaseConfig {
+	// Check if E2E test mode is enabled
+	if c.v.GetBool("e2e.test_mode") || os.Getenv("E2E_TEST_MODE") == "true" {
+		return c.GetTestDatabaseConfig()
+	}
+
 	return domain.DatabaseConfig{
 		Host:            c.v.GetString("database.host"),
 		Port:            c.v.GetInt("database.port"),
 		User:            c.v.GetString("database.user"),
 		Password:        c.v.GetString("database.password"),
 		DBName:          c.v.GetString("database.dbname"),
+		MaxOpenConns:    c.v.GetInt("database.max_open_conns"),
+		MaxIdleConns:    c.v.GetInt("database.max_idle_conns"),
+		ConnMaxLifetime: c.v.GetDuration("database.conn_max_lifetime"),
+	}
+}
+
+// GetTestDatabaseConfig returns test database configuration
+func (c *configService) GetTestDatabaseConfig() domain.DatabaseConfig {
+	return domain.DatabaseConfig{
+		Host:            c.v.GetString("shortlink.test_db_host"),
+		Port:            c.v.GetInt("shortlink.test_db_port"),
+		User:            c.v.GetString("shortlink.test_db_user"),
+		Password:        c.v.GetString("shortlink.test_db_password"),
+		DBName:          c.v.GetString("shortlink.test_db_name"),
 		MaxOpenConns:    c.v.GetInt("database.max_open_conns"),
 		MaxIdleConns:    c.v.GetInt("database.max_idle_conns"),
 		ConnMaxLifetime: c.v.GetDuration("database.conn_max_lifetime"),

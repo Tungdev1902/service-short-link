@@ -1,0 +1,49 @@
+name: "Health Check Endpoints E2E Test"
+steps:
+  - name: "Service Info"
+    request:
+      method: GET
+      url: /
+    expect:
+      status: 200
+      contains: ["name", "version", "uptime"]
+
+  - name: "Health Check"
+    request:
+      method: GET
+      url: /health
+    expect:
+      status: 200
+      contains: ["status", "healthy"]
+
+  - name: "Readiness Probe"
+    request:
+      method: GET
+      url: /ready
+    expect:
+      status: 200
+      contains: ["ready"]
+
+  - name: "Liveness Probe"
+    request:
+      method: GET
+      url: /live
+    expect:
+      status: 200
+      contains: ["alive"]
+
+  - name: "Swagger Documentation"
+    request:
+      method: GET
+      url: /swagger
+    expect:
+      status: 301
+      contains: ["swagger"]
+
+  - name: "Swagger Index"
+    request:
+      method: GET
+      url: /swagger/index.html
+    expect:
+      status: 200
+      contains: ["swagger"]

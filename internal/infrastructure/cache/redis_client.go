@@ -39,12 +39,16 @@ func (r *RedisClient) GenerateKey(prefix, key string) string {
 
 // Set stores data with TTL
 func (r *RedisClient) Set(key string, value interface{}, ttl time.Duration) error {
-	return r.client.Set(r.ctx, key, value, ttl).Err()
+	ctx, cancel := context.WithTimeout(r.ctx, 2*time.Second)
+	defer cancel()
+	return r.client.Set(ctx, key, value, ttl).Err()
 }
 
 // Get retrieves data
 func (r *RedisClient) Get(key string) (string, error) {
-	return r.client.Get(r.ctx, key).Result()
+	ctx, cancel := context.WithTimeout(r.ctx, 2*time.Second)
+	defer cancel()
+	return r.client.Get(ctx, key).Result()
 }
 
 // Delete removes data

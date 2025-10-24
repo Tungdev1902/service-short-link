@@ -6,18 +6,16 @@ import (
 	"net/http"
 
 	"service-short-link/internal/domain"
-	"service-short-link/internal/handler/transform"
-	"service-short-link/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 type LinkHandler struct {
-	linkUseCase *usecase.LinkUseCase
+	linkUseCase domain.LinkUseCase
 }
 
 // NewLinkHandler creates a new link handler
-func NewLinkHandler(linkUseCase *usecase.LinkUseCase) *LinkHandler {
+func NewLinkHandler(linkUseCase domain.LinkUseCase) *LinkHandler {
 	return &LinkHandler{
 		linkUseCase: linkUseCase,
 	}
@@ -30,7 +28,7 @@ func NewLinkHandler(linkUseCase *usecase.LinkUseCase) *LinkHandler {
 // @Accept json
 // @Produce json
 // @Param request body domain.CreateLinkRequest true "Create link request - original_url is required, short_code is optional but must be 5-10 alphanumeric characters. Platform/role/channel_code extracted from JWT for internal services."
-// @Success 201 {object} handler.SuccessEnvelope{data=transform.LinkCreatedDTO} "Link created successfully"
+// @Success 201 {object} handler.SuccessEnvelope{data=domain.CreateLinkResponse} "Link created successfully"
 // @Failure 400 {object} handler.ErrorEnvelope "Bad request - invalid input or short code already exists"
 // @Failure 401 {object} handler.ErrorEnvelope "Unauthorized - valid JWT token or API key required"
 // @Failure 500 {object} handler.ErrorEnvelope "Internal server error"
@@ -42,36 +40,6 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, CodeBadRequest, "Invalid request body", err.Error())
 		return
-	}
-
-	if len(req.OriginalURL) > 2048 {
-		RespondError(c, http.StatusBadRequest, CodeBadRequest, "URL too long (max 2048 characters)", nil)
-		return
-	}
-	if req.Title != nil && len(*req.Title) > 255 {
-		RespondError(c, http.StatusBadRequest, CodeBadRequest, "Title too long (max 255 characters)", nil)
-		return
-	}
-	if req.Description != nil && len(*req.Description) > 1000 {
-		RespondError(c, http.StatusBadRequest, CodeBadRequest, "Description too long (max 1000 characters)", nil)
-		return
-	}
-
-	if req.ShortCode != nil && *req.ShortCode != "" {
-		if len(*req.ShortCode) < 5 {
-			RespondError(c, http.StatusBadRequest, CodeBadRequest, "Short code too short (min 5 characters)", nil)
-			return
-		}
-		if len(*req.ShortCode) > 10 {
-			RespondError(c, http.StatusBadRequest, CodeBadRequest, "Short code too long (max 10 characters)", nil)
-			return
-		}
-		for _, char := range *req.ShortCode {
-			if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9')) {
-				RespondError(c, http.StatusBadRequest, CodeBadRequest, "Short code must contain only alphanumeric characters (a-z, A-Z, 0-9)", nil)
-				return
-			}
-		}
 	}
 
 	var platform, role, channelCode *string
@@ -110,8 +78,7 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 		return
 	}
 
-	dto := transform.ToLinkCreatedDTO(response)
-	RespondCreated(c, dto)
+	RespondCreated(c, response)
 }
 
 // RedirectLink godoc

@@ -5,19 +5,19 @@ import (
 	"time"
 
 	"service-short-link/internal/domain"
-	"service-short-link/internal/infrastructure/services"
 	"service-short-link/pkg/logger"
 )
 
 type LinkUseCase struct {
-	linkRepo        domain.LinkRepository
-	linkCache       domain.LinkCache
-	analyticsRepo   domain.AnalyticsRepository
-	codeGenerator   domain.ShortCodeGenerator
-	qrGenerator     domain.QRCodeGenerator
-	urlValidator    domain.URLValidator
-	userAgentParser domain.UserAgentParser
-	configService   domain.ConfigService
+	linkRepo          domain.LinkRepository
+	linkCache         domain.LinkCache
+	analyticsRepo     domain.AnalyticsRepository
+	codeGenerator     domain.ShortCodeGenerator
+	uniqueCodeService domain.UniqueCodeService
+	qrGenerator       domain.QRCodeGenerator
+	urlValidator      domain.URLValidator
+	userAgentParser   domain.UserAgentParser
+	configService     domain.ConfigService
 }
 
 // NewLinkUseCase creates a new link use case
@@ -26,20 +26,22 @@ func NewLinkUseCase(
 	linkCache domain.LinkCache,
 	analyticsRepo domain.AnalyticsRepository,
 	codeGenerator domain.ShortCodeGenerator,
+	uniqueCodeService domain.UniqueCodeService,
 	qrGenerator domain.QRCodeGenerator,
 	urlValidator domain.URLValidator,
 	userAgentParser domain.UserAgentParser,
 	configService domain.ConfigService,
 ) *LinkUseCase {
 	return &LinkUseCase{
-		linkRepo:        linkRepo,
-		linkCache:       linkCache,
-		analyticsRepo:   analyticsRepo,
-		codeGenerator:   codeGenerator,
-		qrGenerator:     qrGenerator,
-		urlValidator:    urlValidator,
-		userAgentParser: userAgentParser,
-		configService:   configService,
+		linkRepo:          linkRepo,
+		linkCache:         linkCache,
+		analyticsRepo:     analyticsRepo,
+		codeGenerator:     codeGenerator,
+		uniqueCodeService: uniqueCodeService,
+		qrGenerator:       qrGenerator,
+		urlValidator:      urlValidator,
+		userAgentParser:   userAgentParser,
+		configService:     configService,
 	}
 }
 
@@ -48,7 +50,7 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 	normalizedURL, err := uc.urlValidator.Normalize(req.OriginalURL)
 	if err != nil {
 		logger.ErrorWithCockroachSimple(err, "CreateLink: failed to normalize URL", "original_url="+req.OriginalURL, "error_type=url_validation_failed")
-		return nil, fmt.Errorf("invalid URL: %w", err)
+		return nil, domain.ErrInvalidURL
 	}
 
 	if !uc.urlValidator.IsSafeURL(normalizedURL) {
@@ -72,7 +74,7 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 
 		shortCode = *req.ShortCode
 	} else {
-		shortCode, err = services.GenerateUniqueCode(
+		shortCode, err = uc.uniqueCodeService.GenerateUniqueCode(
 			uc.codeGenerator,
 			uc.linkRepo,
 			uc.configService.GetInt("shortlink.shortcode_length"),
@@ -85,9 +87,14 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 
 	var expiresAt *time.Time
 	// Use integer seconds; 0 or unset means no expiry
-	if seconds := uc.configService.GetInt("shortlink.default_expiry_seconds"); seconds > 0 {
+	seconds := uc.configService.GetInt("shortlink.default_expiry_seconds")
+
+	if seconds > 0 {
 		expiry := time.Now().Add(time.Duration(seconds) * time.Second)
 		expiresAt = &expiry
+		logger.Info("CreateLink: setting expiry", map[string]interface{}{
+			"expires_at": expiry.Format(time.RFC3339),
+		})
 	}
 
 	// Create link entity
@@ -113,22 +120,15 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 	}
 
 	ttl := time.Duration(uc.configService.GetInt("cache.ttl_links")) * time.Second
-	err = uc.linkCache.Set(shortCode, link, ttl)
+	err = uc.linkCache.Set(shortCode, link.ToCache(), ttl)
 	if err != nil {
 		logger.ErrorWithCockroachSimple(err, "CreateLink: failed to cache link", "short_code="+shortCode, "error_type=cache_set_failed")
 	}
 
 	baseURL := uc.configService.GetString("shortlink.base_url")
 	response := &domain.CreateLinkResponse{
-		ID:          link.ID,
-		ShortCode:   link.ShortCode,
-		ShortURL:    fmt.Sprintf("%s/%s", baseURL, link.ShortCode),
-		QRCodeURL:   fmt.Sprintf("%s/qr/%s", baseURL, link.ShortCode),
-		OriginalURL: link.OriginalURL,
-		Title:       link.Title,
-		Description: link.Description,
-		ExpiresAt:   link.ExpiresAt,
-		CreatedAt:   link.CreatedAt,
+		ShortURL:  fmt.Sprintf("%s/%s", baseURL, link.ShortCode),
+		QRCodeURL: fmt.Sprintf("%s/qr/%s", baseURL, link.ShortCode),
 	}
 
 	return response, nil
@@ -136,17 +136,31 @@ func (uc *LinkUseCase) CreateLink(req *domain.CreateLinkRequest, platform, role,
 
 // RedirectLink handles link redirection with analytics tracking
 func (uc *LinkUseCase) RedirectLink(shortCode string, trackingData *domain.TrackingData) (string, error) {
-	link, err := uc.linkCache.Get(shortCode)
-	if err != nil || link == nil {
-		link, err = uc.linkRepo.GetByShortCode(shortCode)
-		if err != nil {
-			logger.ErrorWithCockroachSimple(err, "RedirectLink: failed to get link from database", "short_code="+shortCode, "error_type=database_query_failed")
-			return "", err
-		}
+	if cachedLink, err := uc.linkCache.Get(shortCode); err == nil && cachedLink != nil {
+		return uc.handleCacheHit(cachedLink, trackingData)
+	}
 
-		// Update cache for next time
-		ttl := time.Duration(uc.configService.GetInt("cache.ttl_links")) * time.Second
-		uc.linkCache.Set(shortCode, link, ttl)
+	return uc.handleCacheMiss(shortCode, trackingData)
+}
+
+// handleCacheHit processes redirect when link is found in cache
+func (uc *LinkUseCase) handleCacheHit(cachedLink *domain.CachedLink, trackingData *domain.TrackingData) (string, error) {
+	if err := uc.checkLinkAccessibility(cachedLink.IsActive, cachedLink.ExpiresAt); err != nil {
+		return "", err
+	}
+
+	uc.trackLinkUsage(cachedLink.ID, trackingData)
+
+	return cachedLink.OriginalURL, nil
+}
+
+// handleCacheMiss processes redirect when link is not in cache
+func (uc *LinkUseCase) handleCacheMiss(shortCode string, trackingData *domain.TrackingData) (string, error) {
+	link, err := uc.linkRepo.GetForRedirect(shortCode)
+	if err != nil {
+		logger.ErrorWithCockroachSimple(err, "RedirectLink: failed to get link from database",
+			"short_code", shortCode, "error_type", "database_query_failed")
+		return "", err
 	}
 
 	if !link.IsAccessible() {
@@ -156,16 +170,52 @@ func (uc *LinkUseCase) RedirectLink(shortCode string, trackingData *domain.Track
 		return "", domain.ErrLinkInactive
 	}
 
-	go func() {
-		uc.linkRepo.IncrementClickCount(link.ID)
-		uc.linkRepo.UpdateLastAccessed(link.ID)
-	}()
+	uc.updateLinkCacheFromRedirect(shortCode, link)
 
-	go func() {
-		uc.trackAnalytics(link.ID, trackingData)
-	}()
+	uc.trackLinkUsage(link.ID, trackingData)
 
 	return link.OriginalURL, nil
+}
+
+// checkLinkAccessibility validates if link can be accessed
+func (uc *LinkUseCase) checkLinkAccessibility(isActive bool, expiresAt *time.Time) error {
+	if !isActive {
+		return domain.ErrLinkInactive
+	}
+
+	if expiresAt != nil && time.Now().After(*expiresAt) {
+		return domain.ErrLinkExpired
+	}
+
+	return nil
+}
+
+// updateLinkCacheFromRedirect stores redirect link in cache with configured TTL
+func (uc *LinkUseCase) updateLinkCacheFromRedirect(shortCode string, link *domain.LinkForRedirect) {
+	ttl := time.Duration(uc.configService.GetInt("cache.ttl_links")) * time.Second
+	if err := uc.linkCache.Set(shortCode, link.ToCache(), ttl); err != nil {
+		logger.ErrorWithCockroachSimple(err, "RedirectLink: failed to update cache",
+			"short_code", shortCode, "error_type", "cache_set_failed")
+	}
+}
+
+// trackLinkUsage handles all analytics tracking asynchronously
+func (uc *LinkUseCase) trackLinkUsage(linkID uint64, trackingData *domain.TrackingData) {
+	go func() {
+		linkIDStr := fmt.Sprintf("%d", linkID)
+
+		if err := uc.linkRepo.IncrementClickCount(linkID); err != nil {
+			logger.ErrorWithCockroachSimple(err, "Failed to increment click count",
+				"link_id", linkIDStr)
+		}
+
+		if err := uc.linkRepo.UpdateLastAccessed(linkID); err != nil {
+			logger.ErrorWithCockroachSimple(err, "Failed to update last accessed",
+				"link_id", linkIDStr)
+		}
+
+		uc.trackAnalytics(linkID, trackingData)
+	}()
 }
 
 // GenerateQRCode generates QR code for a short link
@@ -175,9 +225,10 @@ func (uc *LinkUseCase) GenerateQRCode(shortCode string) ([]byte, error) {
 		return qrData, nil
 	}
 
-	link, err := uc.linkRepo.GetByShortCode(shortCode)
+	link, err := uc.linkRepo.GetForRedirect(shortCode)
 	if err != nil {
-		logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to get link from database", "short_code="+shortCode, "error_type=database_query_failed")
+		logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to get link from database",
+			"short_code", shortCode, "error_type", "database_query_failed")
 		return nil, err
 	}
 
@@ -193,7 +244,8 @@ func (uc *LinkUseCase) GenerateQRCode(shortCode string) ([]byte, error) {
 
 	qrData, err = uc.qrGenerator.Generate(shortURL, 256)
 	if err != nil {
-		logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to generate QR", "short_code="+shortCode, "short_url="+shortURL)
+		logger.ErrorWithCockroachSimple(err, "GenerateQRCode: failed to generate QR",
+			"short_code", shortCode, "short_url", shortURL)
 		return nil, fmt.Errorf("failed to generate QR code: %w", err)
 	}
 

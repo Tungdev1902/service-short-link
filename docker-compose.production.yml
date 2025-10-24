@@ -153,6 +153,8 @@ services:
       --maxmemory-policy allkeys-lru
       --tcp-keepalive 60
       --timeout 300
+      --maxclients 10000
+      --tcp-backlog 511
       --save 900 1
       --save 300 10
       --save 60 10000

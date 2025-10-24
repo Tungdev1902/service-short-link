@@ -27,12 +27,12 @@ func NewLinkCache(client *redis.Client) domain.LinkCache {
 	}
 }
 
-// Set stores a link in the cache with TTL
-func (c *linkCache) Set(key string, link *domain.Link, ttl time.Duration) error {
+// Set stores a cached link in the cache with TTL
+func (c *linkCache) Set(key string, link *domain.CachedLink, ttl time.Duration) error {
 	data, err := json.Marshal(link)
 	if err != nil {
-		logger.ErrorWithCockroachSimple(err, "LinkCache.Set: failed to marshal link", "key="+key, "error_type=json_marshal_failed")
-		return fmt.Errorf("failed to marshal link: %w", err)
+		logger.ErrorWithCockroachSimple(err, "LinkCache.Set: failed to marshal cached link", "key="+key, "error_type=json_marshal_failed")
+		return fmt.Errorf("failed to marshal cached link: %w", err)
 	}
 
 	cacheKey := c.redisClient.GenerateKey(linkKeyPrefix, key)
@@ -45,8 +45,8 @@ func (c *linkCache) Set(key string, link *domain.Link, ttl time.Duration) error 
 	return nil
 }
 
-// Get retrieves a link from the cache
-func (c *linkCache) Get(key string) (*domain.Link, error) {
+// Get retrieves a cached link from the cache
+func (c *linkCache) Get(key string) (*domain.CachedLink, error) {
 	cacheKey := c.redisClient.GenerateKey(linkKeyPrefix, key)
 	data, err := c.redisClient.Get(cacheKey)
 	if err != nil {
@@ -57,14 +57,14 @@ func (c *linkCache) Get(key string) (*domain.Link, error) {
 		return nil, fmt.Errorf("failed to get link cache: %w", err)
 	}
 
-	var link domain.Link
-	err = json.Unmarshal([]byte(data), &link)
+	var cachedLink domain.CachedLink
+	err = json.Unmarshal([]byte(data), &cachedLink)
 	if err != nil {
-		logger.ErrorWithCockroachSimple(err, "LinkCache.Get: failed to unmarshal link", "key="+key, "cache_key="+cacheKey, "error_type=json_unmarshal_failed")
-		return nil, fmt.Errorf("failed to unmarshal link: %w", err)
+		logger.ErrorWithCockroachSimple(err, "LinkCache.Get: failed to unmarshal cached link", "key="+key, "cache_key="+cacheKey, "error_type=json_unmarshal_failed")
+		return nil, fmt.Errorf("failed to unmarshal cached link: %w", err)
 	}
 
-	return &link, nil
+	return &cachedLink, nil
 }
 
 func (c *linkCache) SetQRCode(shortCode string, qrData []byte, ttl time.Duration) error {

@@ -32,9 +32,13 @@ type ServerConfig struct {
 
 // ShortCodeGenerator defines the interface for generating short codes
 type ShortCodeGenerator interface {
-	Generate() string
 	GenerateWithLength(length int) string
 	IsValid(shortCode string) bool
+}
+
+// UniqueCodeService defines the interface for generating unique short codes
+type UniqueCodeService interface {
+	GenerateUniqueCode(generator ShortCodeGenerator, repo LinkRepository, length int) (string, error)
 }
 
 // QRCodeGenerator defines the interface for generating QR codes
@@ -45,10 +49,10 @@ type QRCodeGenerator interface {
 
 // QRCodeOptions represents options for QR code generation
 type QRCodeOptions struct {
-	Size        int
-	BorderSize  int
-	ErrorLevel  QRErrorLevel
-	Format      QRFormat
+	Size       int
+	BorderSize int
+	ErrorLevel QRErrorLevel
+	Format     QRFormat
 }
 
 // QRErrorLevel represents the error correction level for QR codes
@@ -86,5 +90,13 @@ type ConfigService interface {
 	GetAPIKeys() []string
 	GetServerConfig() ServerConfig
 	GetDatabaseConfig() DatabaseConfig
+	GetTestDatabaseConfig() DatabaseConfig
 	GetRedisConfig() RedisConfig
+}
+
+// LinkUseCase defines the interface for link business logic
+type LinkUseCase interface {
+	CreateLink(req *CreateLinkRequest, platform, role, channelCode *string) (*CreateLinkResponse, error)
+	RedirectLink(shortCode string, trackingData *TrackingData) (string, error)
+	GenerateQRCode(shortCode string) ([]byte, error)
 }

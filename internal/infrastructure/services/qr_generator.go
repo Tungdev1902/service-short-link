@@ -26,7 +26,7 @@ func (g *qrCodeGenerator) Generate(data string, size int) ([]byte, error) {
 		size = g.defaultSize
 	}
 
-	qrCode, err := qrcode.New(data, qrcode.Medium)
+	qrCode, err := qrcode.New(data, qrcode.High)
 	if err != nil {
 		logger.ErrorWithCockroachSimple(err, "QRGenerator.Generate: failed to create QR code", "data="+data, "size="+fmt.Sprintf("%d", size), "error_type=qr_code_creation_failed")
 		return nil, fmt.Errorf("failed to create QR code: %w", err)
@@ -66,7 +66,7 @@ func (g *qrCodeGenerator) GenerateWithOptions(data string, size int, options dom
 
 	qrCode, err := qrcode.New(data, errorLevel)
 	if err != nil {
-		logger.ErrorWithCockroachSimple(err, "QRGenerator.GenerateWithOptions: failed to create QR code", "data="+data, "size="+fmt.Sprintf("%d", options.Size), "error_level="+string(options.ErrorLevel), "error_type=qr_code_creation_failed")
+		logger.ErrorWithCockroachSimple(err, "QRGenerator.GenerateWithOptions: failed to create QR code", "data="+data, "size="+fmt.Sprintf("%d", options.Size), "error_level="+fmt.Sprintf("%d", options.ErrorLevel), "error_type=qr_code_creation_failed")
 		return nil, fmt.Errorf("failed to create QR code: %w", err)
 	}
 
@@ -76,7 +76,7 @@ func (g *qrCodeGenerator) GenerateWithOptions(data string, size int, options dom
 	default:
 		pngData, err := qrCode.PNG(size)
 		if err != nil {
-			logger.ErrorWithCockroachSimple(err, "QRGenerator.GenerateWithOptions: failed to generate PNG", "data="+data, "size="+fmt.Sprintf("%d", size), "format="+string(options.Format), "error_type=png_generation_failed")
+			logger.ErrorWithCockroachSimple(err, "QRGenerator.GenerateWithOptions: failed to generate PNG", "data="+data, "size="+fmt.Sprintf("%d", size), "format="+fmt.Sprintf("%d", options.Format), "error_type=png_generation_failed")
 			return nil, fmt.Errorf("failed to generate PNG: %w", err)
 		}
 		return pngData, nil

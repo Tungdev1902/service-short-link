@@ -14,9 +14,10 @@ import (
 type urlValidator struct {
 	httpPattern  *regexp.Regexp
 	httpsPattern *regexp.Regexp
-	
+
 	blacklistedDomains []string
 	maliciousPatterns  []*regexp.Regexp
+	domainLabelPattern *regexp.Regexp
 }
 
 // NewURLValidator creates a new URL validator
@@ -40,6 +41,7 @@ func NewURLValidator() domain.URLValidator {
 			regexp.MustCompile(`file:`),
 			regexp.MustCompile(`ftp:`),
 		},
+		domainLabelPattern: regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`),
 	}
 }
 
@@ -67,11 +69,8 @@ func (v *urlValidator) IsValid(rawURL string) bool {
 		return false
 	}
 
-	lowerURL := strings.ToLower(rawURL)
-	lowerDecodedURL := strings.ToLower(decodedURL)
-	
 	for _, pattern := range v.maliciousPatterns {
-		if pattern.MatchString(lowerURL) || pattern.MatchString(lowerDecodedURL) {
+		if pattern.MatchString(rawURL) || pattern.MatchString(decodedURL) {
 			return false
 		}
 	}
@@ -133,7 +132,7 @@ func (v *urlValidator) IsSafeURL(rawURL string) bool {
 	}
 
 	host := strings.ToLower(parsedURL.Host)
-	
+
 	if strings.Contains(host, ":") {
 		host, _, _ = net.SplitHostPort(host)
 	}
@@ -188,8 +187,8 @@ func (v *urlValidator) isValidDomain(domain string) bool {
 		if len(label) == 0 || len(label) > 63 {
 			return false
 		}
-		
-		if !regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`).MatchString(label) {
+
+		if !v.domainLabelPattern.MatchString(label) {
 			return false
 		}
 	}
@@ -206,7 +205,7 @@ func (v *urlValidator) isPrivateIP(host string) bool {
 
 	privateRanges := []string{
 		"10.0.0.0/8",
-		"172.16.0.0/12", 
+		"172.16.0.0/12",
 		"192.168.0.0/16",
 		"127.0.0.0/8",
 		"169.254.0.0/16",

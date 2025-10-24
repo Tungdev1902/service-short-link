@@ -1,0 +1,53 @@
+name: "Performance & Load Testing E2E"
+steps:
+  - name: "Create multiple links rapidly"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/status/200"
+    expect:
+      status: 201
+
+  - name: "Create another link immediately"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/status/201"
+    expect:
+      status: 201
+
+  - name: "Create test123 link for performance testing"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://httpbin.org/status/200"
+        short_code: "test123"
+    expect:
+      status: 201
+
+  - name: "Test concurrent redirects simulation"
+    request:
+      method: GET
+      url: /test123
+    expect:
+      status: 302
+
+  - name: "Test concurrent QR generation"
+    request:
+      method: GET
+      url: /qr/test123
+    expect:
+      status: 200
+      header:
+        Content-Type: "image/png"
+
+  - name: "Test health check under load"
+    request:
+      method: GET
+      url: /health
+    expect:
+      status: 200
+      contains: ["healthy"]

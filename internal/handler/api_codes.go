@@ -6,8 +6,6 @@ const (
 	CodeUnauthorized       = "UNAUTHORIZED"
 	CodeForbidden          = "FORBIDDEN"
 	CodeNotFound           = "NOT_FOUND"
-	CodeLinkExpired        = "LINK_EXPIRED"
-	CodeLinkInactive       = "LINK_INACTIVE"
 	CodeConflict           = "CONFLICT" // e.g., short code exists
 	CodeGone               = "GONE"     // resource no longer available
 	CodeRequestTimeout     = "REQUEST_TIMEOUT"

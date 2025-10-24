@@ -106,6 +106,8 @@ func main() {
 	minLen := configService.GetInt("shortlink.shortcode_min_length")
 	maxLen := configService.GetInt("shortlink.shortcode_max_length")
 	shortCodeGenerator := services.NewShortCodeGeneratorWithBounds(minLen, maxLen)
+
+	uniqueCodeService := services.NewUniqueCodeService()
 	qrGenerator := services.NewQRCodeGenerator()
 	urlValidator := services.NewURLValidator()
 	userAgentParser := services.NewUserAgentParser()
@@ -115,6 +117,7 @@ func main() {
 		linkCache,
 		analyticsRepo,
 		shortCodeGenerator,
+		uniqueCodeService,
 		qrGenerator,
 		urlValidator,
 		userAgentParser,
@@ -238,7 +241,7 @@ func setupRouter(
 func initDatabase(configService domain.ConfigService) (*sql.DB, error) {
 	dbConfig := configService.GetDatabaseConfig()
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&tls=false&allowNativePasswords=true&multiStatements=false&interpolateParams=true&readTimeout=5s&writeTimeout=5s&timeout=5s",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&tls=false&allowNativePasswords=true&multiStatements=false&interpolateParams=true&readTimeout=10s&writeTimeout=10s&timeout=10s&maxAllowedPacket=16777216",
 		dbConfig.User,
 		dbConfig.Password,
 		dbConfig.Host,
@@ -254,6 +257,13 @@ func initDatabase(configService domain.ConfigService) (*sql.DB, error) {
 	db.SetMaxOpenConns(dbConfig.MaxOpenConns)
 	db.SetMaxIdleConns(dbConfig.MaxIdleConns)
 	db.SetConnMaxLifetime(dbConfig.ConnMaxLifetime)
+
+	// Log connection pool stats
+	logger.Info("Database connection pool configured", map[string]interface{}{
+		"max_open_conns":    dbConfig.MaxOpenConns,
+		"max_idle_conns":    dbConfig.MaxIdleConns,
+		"conn_max_lifetime": dbConfig.ConnMaxLifetime,
+	})
 
 	if err := pingDatabaseWithRetry(db, 8, 500*time.Millisecond, 5*time.Second); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
@@ -289,11 +299,20 @@ func initRedis(configService domain.ConfigService) (*redis.Client, error) {
 	redisConfig := configService.GetRedisConfig()
 
 	client := redis.NewClient(&redis.Options{
-		Addr:         fmt.Sprintf("%s:%d", redisConfig.Host, redisConfig.Port),
-		Password:     redisConfig.Password,
-		DB:           redisConfig.Database,
-		PoolSize:     redisConfig.PoolSize,
-		MinIdleConns: redisConfig.MinIdleConns,
+		Addr:               fmt.Sprintf("%s:%d", redisConfig.Host, redisConfig.Port),
+		Password:           redisConfig.Password,
+		DB:                 redisConfig.Database,
+		PoolSize:           redisConfig.PoolSize,
+		MinIdleConns:       redisConfig.MinIdleConns,
+		MaxRetries:         3,
+		MinRetryBackoff:    8 * time.Millisecond,
+		MaxRetryBackoff:    512 * time.Millisecond,
+		DialTimeout:        5 * time.Second,
+		ReadTimeout:        3 * time.Second,
+		WriteTimeout:       3 * time.Second,
+		PoolTimeout:        4 * time.Second,
+		IdleTimeout:        5 * time.Minute,
+		IdleCheckFrequency: 1 * time.Minute,
 	})
 
 	// Test connection

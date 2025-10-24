@@ -27,6 +27,13 @@ services:
       - API_KEYS=dev-api-key-12345,test-api-key-67890
       - BASE_URL=http://localhost:8080
       - DOMAIN=localhost
+      - DEFAULT_EXPIRY_SECONDS=${DEFAULT_EXPIRY_SECONDS:-300}
+      - E2E_TEST_MODE=${E2E_TEST_MODE:-false}
+      - TEST_DB_HOST=${TEST_DB_HOST:-mariadb_test}
+      - TEST_DB_PORT=${TEST_DB_PORT:-3306}
+      - TEST_DB_USER=${TEST_DB_USER:-testuser}
+      - TEST_DB_PASSWORD=${TEST_DB_PASSWORD:-testpass}
+      - TEST_DB_NAME=${TEST_DB_NAME:-shortlink_db_test}
     volumes:
       - .:/app:cached 
       - go-mod-cache:/go/pkg/mod 
@@ -34,13 +41,15 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+      mariadb_test:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - shortlink-network
 
   mariadb:
-    image: mysql:8.0
+    image: mariadb:10.11
     container_name: mariadb_debug
     restart: unless-stopped
     environment:
@@ -81,6 +90,44 @@ services:
     networks:
       - shortlink-network
 
+  redis_ui:
+    image: patrikx3/p3x-redis-ui:latest
+    container_name: redis_ui
+    restart: unless-stopped
+    ports:
+      - "7843:7843"
+    volumes:
+      - ./docker/redis-ui-settings:/settings
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - shortlink-network
+
+  mariadb_test:
+    image: mariadb:10.11
+    container_name: mariadb_test_debug
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=testrootpass
+      - MYSQL_DATABASE=shortlink_db_test
+      - MYSQL_USER=testuser
+      - MYSQL_PASSWORD=testpass
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "3316:3306"
+    volumes:
+      - mariadb-test-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptestrootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shortlink-network
+
 networks:
   shortlink-network:
     driver: bridge
@@ -90,5 +137,9 @@ volumes:
     driver: local
   redis-data:
     driver: local
+  redis-ui-settings:
+    driver: local
   go-mod-cache:
+    driver: local
+  mariadb-test-data:
     driver: local

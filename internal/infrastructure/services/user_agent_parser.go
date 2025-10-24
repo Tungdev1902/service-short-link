@@ -18,6 +18,9 @@ type userAgentParser struct {
 	macPattern     *regexp.Regexp
 	linuxPattern   *regexp.Regexp
 
+	androidVersionPattern *regexp.Regexp
+	macVersionPattern     *regexp.Regexp
+
 	chromePattern  *regexp.Regexp
 	firefoxPattern *regexp.Regexp
 	safariPattern  *regexp.Regexp
@@ -38,6 +41,9 @@ func NewUserAgentParser() domain.UserAgentParser {
 		windowsPattern: regexp.MustCompile(`(?i)Windows`),
 		macPattern:     regexp.MustCompile(`(?i)Macintosh|Mac OS X`),
 		linuxPattern:   regexp.MustCompile(`(?i)Linux|X11`),
+
+		androidVersionPattern: regexp.MustCompile(`(?i)Android ([0-9.]+)`),
+		macVersionPattern:     regexp.MustCompile(`(?i)Mac OS X ([0-9_]+)`),
 
 		chromePattern:  regexp.MustCompile(`(?i)Chrome/([0-9.]+)`),
 		firefoxPattern: regexp.MustCompile(`(?i)Firefox/([0-9.]+)`),
@@ -97,11 +103,12 @@ func (p *userAgentParser) parseDevice(userAgent string) string {
 func (p *userAgentParser) parseOS(userAgent string) string {
 	// Check for iOS first
 	if p.iosPattern.MatchString(userAgent) {
-		if strings.Contains(strings.ToLower(userAgent), "iphone") {
+		lu := strings.ToLower(userAgent)
+		if strings.Contains(lu, "iphone") {
 			return "iOS (iPhone)"
-		} else if strings.Contains(strings.ToLower(userAgent), "ipad") {
+		} else if strings.Contains(lu, "ipad") {
 			return "iOS (iPad)"
-		} else if strings.Contains(strings.ToLower(userAgent), "ipod") {
+		} else if strings.Contains(lu, "ipod") {
 			return "iOS (iPod)"
 		}
 		return "iOS"
@@ -109,8 +116,7 @@ func (p *userAgentParser) parseOS(userAgent string) string {
 
 	// Check for Android
 	if p.androidPattern.MatchString(userAgent) {
-		androidVersionPattern := regexp.MustCompile(`(?i)Android ([0-9.]+)`)
-		if matches := androidVersionPattern.FindStringSubmatch(userAgent); len(matches) > 1 {
+		if matches := p.androidVersionPattern.FindStringSubmatch(userAgent); len(matches) > 1 {
 			return "Android " + matches[1]
 		}
 		return "Android"
@@ -135,8 +141,7 @@ func (p *userAgentParser) parseOS(userAgent string) string {
 	}
 
 	if p.macPattern.MatchString(userAgent) {
-		macVersionPattern := regexp.MustCompile(`(?i)Mac OS X ([0-9_]+)`)
-		if matches := macVersionPattern.FindStringSubmatch(userAgent); len(matches) > 1 {
+		if matches := p.macVersionPattern.FindStringSubmatch(userAgent); len(matches) > 1 {
 			version := strings.ReplaceAll(matches[1], "_", ".")
 			return "macOS " + version
 		}

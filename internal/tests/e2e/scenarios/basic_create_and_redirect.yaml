@@ -1,0 +1,49 @@
+name: "Basic Create & Redirect Flow"
+steps:
+  - name: "Create link"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://e2e-yaml-shortlink.example.com/${NOW}"
+    extract:
+      short_code: "$.data.short_url"
+    expect:
+      status: 201
+  - name: "Redirect link"
+    request:
+      method: GET
+      url: /${short_code}
+    expect:
+      status: 302
+  - name: "QR code"
+    request:
+      method: GET
+      url: /qr/${short_code}
+    expect:
+      status: 200
+      header:
+        Content-Type: image/png
+  - name: "Create link với URL sai"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "not-a-valid-url"
+    expect:
+      status: 400
+  - name: "Redirect - short code không tồn tại"
+    request:
+      method: GET
+      url: /notexist-e2e
+    expect:
+      status: 404
+  - name: "Create link conflict"
+    request:
+      method: POST
+      url: /api/v1/links
+      body:
+        original_url: "https://e2e-conflict.example.com/${NOW}"
+        short_code: "${short_code}"
+    expect:
+      status: 409

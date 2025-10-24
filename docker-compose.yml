@@ -64,6 +64,12 @@ services:
       - SHORTCODE_MIN_LENGTH=${SHORTCODE_MIN_LENGTH:-5}
       - SHORTCODE_MAX_LENGTH=${SHORTCODE_MAX_LENGTH:-10}
       - DEFAULT_EXPIRY_SECONDS=${DEFAULT_EXPIRY_SECONDS:-0}
+      - E2E_TEST_MODE=${E2E_TEST_MODE:-false}
+      - TEST_DB_HOST=${TEST_DB_HOST:-mariadb_test}
+      - TEST_DB_PORT=${TEST_DB_PORT:-3306}
+      - TEST_DB_USER=${TEST_DB_USER:-testuser}
+      - TEST_DB_PASSWORD=${TEST_DB_PASSWORD:-testpass}
+      - TEST_DB_NAME=${TEST_DB_NAME:-shortlink_db_test}
     volumes:
       - .:/app:cached 
       - go-mod-cache:/go/pkg/mod 
@@ -154,6 +160,30 @@ services:
     networks:
       - shortlink-network
 
+  mariadb_test:
+    image: mysql:8.0
+    container_name: mariadb_test
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=testrootpass
+      - MYSQL_DATABASE=shortlink_db_test
+      - MYSQL_USER=testuser
+      - MYSQL_PASSWORD=testpass
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "3316:3306"
+    volumes:
+      - mariadb-test-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptestrootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shortlink-network
+
 networks:
   shortlink-network:
     driver: bridge
@@ -164,4 +194,6 @@ volumes:
   redis-data:
     driver: local
   go-mod-cache:
+    driver: local
+  mariadb-test-data:
     driver: local
